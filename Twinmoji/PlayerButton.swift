@@ -8,11 +8,27 @@
 import SwiftUI
 
 struct PlayerButton: View {
+    var answerState: AnswerState
+    var score: Int
+    var color: Color
+    var onSelect: () -> Void
+    
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        Button(action: onSelect) {
+            Rectangle()
+                .fill(color)
+                .frame(minWidth: 60)
+                .overlay(
+                    Text("\(score)")
+                        .fixedSize()
+                        .foregroundStyle(.white)
+                        .font(.system(size: 48).bold())
+                )
+        }
+        .disabled(answerState != .waiting)
     }
 }
 
 #Preview {
-    PlayerButton()
+    PlayerButton(answerState: .waiting, score: 5, color: .blue) { }
 }

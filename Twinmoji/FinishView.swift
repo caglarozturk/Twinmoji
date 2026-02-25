@@ -6,13 +6,48 @@
 //
 
 import SwiftUI
+import Vortex
 
 struct FinishView: View {
+    
+    @Binding var gameStatus: GameStatus
+    
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        ZStack {
+            VortexViewReader { proxy in
+                VortexView(.confetti) {
+                    Rectangle()
+                        .fill(.white)
+                        .frame(width: 16, height: 16)
+                        .tag("square")
+                    
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 16)
+                        .tag("circle")
+                }
+                
+                VStack(spacing: 10) {
+                    Text("Tebrikler KÜÇÜK BOSS ALPEREN!")
+                        .font(.largeTitle)
+                        .fontDesign(.rounded)
+                    
+                    Button("Settings") {
+                        gameStatus = .settings
+                    }
+                    .buttonStyle(.borderedProminent)
+                    
+                    Button("New Game") {
+                        gameStatus = .playing
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .onAppear(perform: proxy.burst)
+            }
+        }
     }
 }
 
 #Preview {
-    FinishView()
+    FinishView(gameStatus: .constant(.settings))
 }
