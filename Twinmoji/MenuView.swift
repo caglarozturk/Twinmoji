@@ -15,16 +15,27 @@ enum GameStatus {
     case playing, settings, finished
 }
 
+enum GameMode {
+    case twoPlayer, singlePlayer
+}
+
 struct MenuView: View {
     
     @State private var timeOut = 1.0
     @State private var items = 12
     @State private var emojiType = EmojiType.emoji
     @State private var gameStatus = GameStatus.settings
+    @State private var gameMode = GameMode.twoPlayer
+    @State private var finalPlayer1Score = 0
+    @State private var finalPlayer2Score = 0
+    @State private var showStats = false
+    @State private var winScore = 5
     
     var body: some View {
-        if gameStatus == .playing {
-            ContentView(itemCount: items, answerTime: timeOut, gameStatus: $gameStatus, emojiType: $emojiType)
+        if gameStatus == .playing && gameMode == .singlePlayer {
+            SinglePlayerView(itemCount: items, answerTime: timeOut, gameStatus: $gameStatus, emojiType: $emojiType)
+        } else if gameStatus == .playing {
+            ContentView(itemCount: items, answerTime: timeOut, winScore: winScore, gameStatus: $gameStatus, emojiType: $emojiType, finalPlayer1Score: $finalPlayer1Score, finalPlayer2Score: $finalPlayer2Score)
         } else if gameStatus == .settings {
             VStack(spacing: 10) {
                 Text("Twinmoji")
@@ -33,6 +44,15 @@ struct MenuView: View {
                 
                 Text("Tap the twin emojis as fast as you can!")
                     .foregroundStyle(.secondary)
+                
+                Text("Game Mode")
+                    .font(.headline)
+                
+                Picker("Game Mode", selection: $gameMode) {
+                    Text("2 Players").tag(GameMode.twoPlayer)
+                    Text("Solo").tag(GameMode.singlePlayer)
+                }
+                .pickerStyle(.segmented)
                 
                 Text("Answer Time")
                     .font(.headline)
@@ -54,6 +74,19 @@ struct MenuView: View {
                 }
                 .pickerStyle(.segmented)
                 
+                if gameMode == .twoPlayer {
+                    Text("Win Score")
+                        .font(.headline)
+                    
+                    Picker("Win Score", selection: $winScore) {
+                        Text("3").tag(3)
+                        Text("5").tag(5)
+                        Text("7").tag(7)
+                        Text("10").tag(10)
+                    }
+                    .pickerStyle(.segmented)
+                }
+                
                 Text("Emoji Type")
                     .font(.headline)
                 
@@ -69,6 +102,11 @@ struct MenuView: View {
                     gameStatus = .playing
                 }
                 .buttonStyle(.borderedProminent)
+                
+                Button("Stats") {
+                    showStats = true
+                }
+                .buttonStyle(.bordered)
             }
             .padding()
             .background(.white)
@@ -77,8 +115,20 @@ struct MenuView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
             .background(Color(white: 0.9))
+            .sheet(isPresented: $showStats) {
+                StatsView()
+            }
         } else if gameStatus == .finished {
-            FinishView(gameStatus: $gameStatus)
+            FinishView(gameStatus: $gameStatus, player1Score: finalPlayer1Score, player2Score: finalPlayer2Score)
+                .onAppear {
+                    let result = GameResult(
+                        date: Date(),
+                        player1Score: finalPlayer1Score,
+                        player2Score: finalPlayer2Score,
+                        gameMode: gameMode == .singlePlayer ? "singlePlayer" : "twoPlayer"
+                    )
+                    StatsManager.shared.saveResult(result)
+                }
         }
     }
 }
