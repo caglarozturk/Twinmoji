@@ -30,24 +30,34 @@ struct CardView: View {
     }
     
     var body: some View {
-        Grid(horizontalSpacing: 0, verticalSpacing: 0) {
-            ForEach(0..<rows, id: \.self) { i in
-                GridRow {
-                    ForEach(0..<columns, id: \.self) { j in
-                        let text = card[i * columns + j]
-                        
-                        Button(text) {
-                            onSelect(text)
+        GeometryReader { geo in
+            let minSize: CGFloat = columns >= 4 ? 16 : 24
+            let emojiSize = max(min(
+                geo.size.width / CGFloat(columns) * 0.7,
+                geo.size.height / CGFloat(rows) * 0.7,
+                64
+            ), minSize)
+            Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+                ForEach(0..<rows, id: \.self) { i in
+                    GridRow {
+                        ForEach(0..<columns, id: \.self) { j in
+                            let text = card[i * columns + j]
+                            
+                            Button(text) {
+                                onSelect(text)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
                 }
             }
+            .font(.system(size: emojiSize))
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .font(.system(size: 64))
-        .padding()
+        .aspectRatio(CGFloat(columns) / CGFloat(rows), contentMode: .fit)
+        .padding(8)
         .background(.white)
         .clipShape(.rect(cornerRadius: 20))
-        .fixedSize()
         .shadow(radius: 10)
         .disabled(userCanAnswer == false)
         .transition(.push(from: .top))

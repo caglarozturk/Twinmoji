@@ -15,14 +15,6 @@ enum AnswerState {
 
 struct ContentView: View {
     
-    let allEmoji = Array("😎🥹🥰😔😂😳🧐🙂😇😅😆😙😬🙃😍🥸😣😶🙄🤨😩😉🥲😋😛🤓😏😭😯😵😐😘😢😠").map(String.init)
-    
-    let allFruit = Array("🍓🍊🍋🍍🍉🍇🍎🍌🍑🥭🥝🍒🍈🍐🍏🥥🫐🍅🧅🧄🥔🍆🌽🫛🥬🥦🥒🥕🫑🌶️🥑🌰🍠🥜").map(String.init)
-    
-    let allAnimal = Array("🐓🦃🕊🦅🦆🦉🦢🦤🦩🦚🦜🐁🐿🦇🐕🐈🐇🐝🐛🐞🐜🕷🦋🦂🪳🦟🪰🐍🐢🐊🦎🐸🐌🦑🐙").map(String.init)
-    
-    let allFlag = Array("🇦🇩🇦🇱🇦🇹🇧🇦🇧🇪🇧🇬🇨🇿🇩🇪🇩🇰🇪🇦🇪🇪🇫🇮🇫🇷🇬🇧🇬🇷🇭🇷🇭🇺🇮🇪🇮🇸🇮🇹🇱🇹🇱🇺🇱🇻🇲🇨🇲🇰🇳🇱🇳🇴🇵🇱🇵🇹🇷🇴🇷🇸🇷🇺🇸🇪🇸🇮🇸🇰🇺🇦🏴󠁧󠁢󠁳󠁣󠁴󠁿🏴󠁧󠁢󠁷󠁬󠁳󠁿🇹🇷").map(String.init)
-    
     @State private var currentEmoji = [String]()
     
     @State private var leftCard = [String]()
@@ -37,7 +29,6 @@ struct ContentView: View {
     @State private var answerAnchor = UnitPoint.center
     
     @State private var currentItemCount = 0
-    @State private var roundsPlayed = 0
     @State private var player1Streak = 0
     @State private var player2Streak = 0
     @State private var streakText = ""
@@ -48,71 +39,112 @@ struct ContentView: View {
     @State private var shakeOffset: CGFloat = 0
     @State private var isPaused = false
     
+    // Score pop animation state
+    @State private var player1ScorePop = ""
+    @State private var showPlayer1ScorePop = false
+    @State private var player2ScorePop = ""
+    @State private var showPlayer2ScorePop = false
+    
     var itemCount: Int
     var answerTime: Double
     var winScore: Int = 5
-    var enableProgression: Bool = true
+    var player1Name: String = "Player 1"
+    var player2Name: String = "Player 2"
     
     @Binding var gameStatus: GameStatus
     @Binding var emojiType: EmojiType
     @Binding var finalPlayer1Score: Int
     @Binding var finalPlayer2Score: Int
     
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    
     var body: some View {
         
-        ZStack(alignment: .topTrailing) {
-            HStack(spacing: 0) {
-                PlayerButton(answerState: answerState, score: player1Score, color: .blue, onSelect: selectPlayer1)
-                
-                ZStack {
-                    answerColor
-                        .scaleEffect(x: answerScale, anchor: answerAnchor)
-                    
-                    if leftCard.isEmpty == false {
-                        HStack {
-                            CardView(card: leftCard, userCanAnswer: answerState != .waiting, onSelect: checkAnswer)
-                            CardView(card: rightCard, userCanAnswer: answerState != .waiting, onSelect: checkAnswer)
-                        }
-                        .padding(.horizontal, 10)
-                        .offset(x: shakeOffset)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(flashColor)
-                                .allowsHitTesting(false)
-                                .padding(.horizontal, 10)
-                        )
-                    }
-                    
-                    if showStreak {
-                        Text(streakText)
-                            .font(.system(size: 36, weight: .heavy))
-                            .foregroundStyle(.orange)
-                            .shadow(color: .black.opacity(0.3), radius: 4)
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                }
-                
-                PlayerButton(answerState: answerState, score: player2Score, color: .red, onSelect: selectPlayer2)
-            }
+        GeometryReader { screen in
+            let safeLeading = screen.safeAreaInsets.leading
+            let safeTrailing = screen.safeAreaInsets.trailing
+            // Visible content width for labels + safe area inset for the colored background extension
+            let contentWidth: CGFloat = max(screen.size.width * 0.11, 80)
+            let playerWidthLeading = safeLeading + contentWidth
+            let playerWidthTrailing = safeTrailing + contentWidth
             
-            HStack(spacing: 12) {
-                Button("Pause", systemImage: "pause.circle") {
-                    isPaused = true
+            ZStack(alignment: .topTrailing) {
+                HStack(spacing: 0) {
+                    PlayerButton(
+                        answerState: answerState,
+                        score: player1Score,
+                        name: player1Name,
+                        color: .blue,
+                        streak: player1Streak,
+                        side: .leading,
+                        scorePop: player1ScorePop,
+                        showScorePop: showPlayer1ScorePop,
+                        onSelect: selectPlayer1
+                    )
+                    .frame(width: playerWidthLeading)
+                    
+                    ZStack {
+                        answerColor
+                            .scaleEffect(x: answerScale, anchor: answerAnchor)
+                        
+                        if leftCard.isEmpty == false {
+                            HStack {
+                                CardView(card: leftCard, userCanAnswer: answerState != .waiting, onSelect: checkAnswer)
+                                CardView(card: rightCard, userCanAnswer: answerState != .waiting, onSelect: checkAnswer)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, verticalSizeClass == .compact ? 8 : 0)
+                            .offset(x: shakeOffset)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(flashColor)
+                                    .allowsHitTesting(false)
+                                    .padding(.horizontal, 10)
+                            )
+                        }
+                        
+                        if showStreak {
+                            Text(streakText)
+                                .font(.system(size: verticalSizeClass == .compact ? 28 : 36, weight: .heavy))
+                                .foregroundStyle(.orange)
+                                .shadow(color: .black.opacity(0.3), radius: 4)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                    }
+                    
+                    PlayerButton(
+                        answerState: answerState,
+                        score: player2Score,
+                        name: player2Name,
+                        color: .red,
+                        streak: player2Streak,
+                        side: .trailing,
+                        scorePop: player2ScorePop,
+                        showScorePop: showPlayer2ScorePop,
+                        onSelect: selectPlayer2
+                    )
+                    .frame(width: playerWidthTrailing)
                 }
-                .symbolVariant(.fill)
-                .labelStyle(.iconOnly)
-                .font(.largeTitle)
-                .tint(.white)
                 
-                Button("End Game", systemImage: "xmark.circle") {
-                    gameStatus = .settings
+                HStack(spacing: 12) {
+                    Button("Pause", systemImage: "pause.circle") {
+                        isPaused = true
+                    }
+                    .symbolVariant(.fill)
+                    .labelStyle(.iconOnly)
+                    .font(verticalSizeClass == .compact ? .title : .largeTitle)
+                    .tint(.white)
+                    
+                    Button("End Game", systemImage: "xmark.circle") {
+                        gameStatus = .intro
+                    }
+                    .symbolVariant(.fill)
+                    .labelStyle(.iconOnly)
+                    .font(verticalSizeClass == .compact ? .title : .largeTitle)
+                    .tint(.white)
                 }
-                .symbolVariant(.fill)
-                .labelStyle(.iconOnly)
-                .font(.largeTitle)
-                .tint(.white)
+                .padding(verticalSizeClass == .compact ? 20 : 40)
             }
-            .padding(40)
         }
         .ignoresSafeArea()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -121,9 +153,9 @@ struct ContentView: View {
             if isPaused {
                 ZStack {
                     Color.black.opacity(0.7)
-                    VStack(spacing: 20) {
+                    VStack(spacing: verticalSizeClass == .compact ? 12 : 20) {
                         Text("Paused")
-                            .font(.system(size: 48, weight: .heavy))
+                            .font(.system(size: verticalSizeClass == .compact ? 32 : 48, weight: .heavy))
                             .foregroundStyle(.white)
                             .fontDesign(.rounded)
                         
@@ -134,7 +166,7 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent)
                         
                         Button("End Game") {
-                            gameStatus = .settings
+                            gameStatus = .intro
                         }
                         .font(.title3)
                         .buttonStyle(.bordered)
@@ -149,7 +181,7 @@ struct ContentView: View {
                 ZStack {
                     Color.black.opacity(0.6)
                     Text("\(countdownValue)")
-                        .font(.system(size: 120, weight: .heavy))
+                        .font(.system(size: verticalSizeClass == .compact ? 80 : 120, weight: .heavy))
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                 }
@@ -158,6 +190,7 @@ struct ContentView: View {
         }
         .persistentSystemOverlays(.hidden)
         .onAppear {
+            MusicManager.shared.stop()
             startCountdown()
         }
     }
@@ -183,32 +216,8 @@ struct ContentView: View {
     }
     
     func createLevel() {
-        if currentItemCount == 0 {
-            currentItemCount = itemCount
-        }
-        
-        // Difficulty progression: increase card size every 2 rounds
-        if enableProgression && roundsPlayed > 0 && roundsPlayed % 2 == 0 {
-            let maxItems = 16
-            if currentItemCount < maxItems {
-                // Move from 9 -> 12 -> 16
-                if currentItemCount == 9 {
-                    currentItemCount = 12
-                } else if currentItemCount == 12 {
-                    currentItemCount = 16
-                }
-            }
-        }
-        
-        if emojiType == .emoji {
-            currentEmoji = allEmoji.shuffled()
-        } else if emojiType == .fruit {
-            currentEmoji = allFruit.shuffled()
-        } else if emojiType == .animal {
-            currentEmoji = allAnimal.shuffled()
-        } else if emojiType == .flag {
-            currentEmoji = allFlag.shuffled()
-        }
+        currentItemCount = itemCount
+        currentEmoji = EmojiData.emojis(for: emojiType).shuffled()
 
         withAnimation(.spring(duration: 0.75)) {
             leftCard = Array(currentEmoji[0..<currentItemCount]).shuffled()
@@ -246,9 +255,11 @@ struct ContentView: View {
         if answerState == .player1 {
             player1Score -= 1
             player1Streak = 0
+            showScorePop(player: 1, text: "-1")
         } else if answerState == .player2 {
             player2Score -= 1
             player2Streak = 0
+            showScorePop(player: 2, text: "-1")
         }
         
         answerState = .waiting
@@ -279,6 +290,7 @@ struct ContentView: View {
                     bonus = player1Streak - 2
                 }
                 player1Score += 1 + bonus
+                showScorePop(player: 1, text: "+\(1 + bonus)")
             } else if answerState == .player2 {
                 player2Streak += 1
                 player1Streak = 0
@@ -286,14 +298,13 @@ struct ContentView: View {
                     bonus = player2Streak - 2
                 }
                 player2Score += 1 + bonus
+                showScorePop(player: 2, text: "+\(1 + bonus)")
             }
             
             if bonus > 0 {
                 let streak = answerState == .player1 ? player1Streak : player2Streak
                 showStreakLabel("\(streak)x Streak! +\(1 + bonus)")
             }
-            
-            roundsPlayed += 1
             
             if player1Score >= winScore || player2Score >= winScore {
                 SoundManager.playGameEnd()
@@ -310,15 +321,43 @@ struct ContentView: View {
             if answerState == .player1 {
                 player1Score -= 1
                 player1Streak = 0
+                showScorePop(player: 1, text: "-1")
             } else if answerState == .player2 {
                 player2Score -= 1
                 player2Streak = 0
+                showScorePop(player: 2, text: "-1")
             }
         }
         
         answerColor = .clear
         answerScale = 0
         answerState = .waiting
+    }
+    
+    func showScorePop(player: Int, text: String) {
+        if player == 1 {
+            player1ScorePop = text
+            withAnimation(.spring(duration: 0.3)) {
+                showPlayer1ScorePop = true
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(0.8))
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showPlayer1ScorePop = false
+                }
+            }
+        } else {
+            player2ScorePop = text
+            withAnimation(.spring(duration: 0.3)) {
+                showPlayer2ScorePop = true
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(0.8))
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showPlayer2ScorePop = false
+                }
+            }
+        }
     }
     
     func flashAnswer(correct: Bool) {
@@ -365,5 +404,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(itemCount: 9, answerTime: 1, gameStatus: .constant(.settings), emojiType: .constant(.emoji), finalPlayer1Score: .constant(0), finalPlayer2Score: .constant(0))
+    ContentView(itemCount: 9, answerTime: 1, gameStatus: .constant(.intro), emojiType: .constant(.emoji), finalPlayer1Score: .constant(0), finalPlayer2Score: .constant(0))
 }

@@ -11,15 +11,17 @@ struct GameResult: Codable, Identifiable {
     let player1Score: Int
     let player2Score: Int
     let gameMode: String // "twoPlayer" or "singlePlayer"
+    var player1Name: String = "Player 1"
+    var player2Name: String = "Player 2"
     
     var winnerText: String {
         if gameMode == "singlePlayer" {
             return "Solo - Score: \(player1Score)"
         }
         if player1Score > player2Score {
-            return "Player 1 Won"
+            return "\(player1Name) Won"
         } else if player2Score > player1Score {
-            return "Player 2 Won"
+            return "\(player2Name) Won"
         }
         return "Tie"
     }

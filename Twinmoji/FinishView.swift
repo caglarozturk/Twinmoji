@@ -13,12 +13,14 @@ struct FinishView: View {
     @Binding var gameStatus: GameStatus
     var player1Score: Int
     var player2Score: Int
+    var player1Name: String = "Player 1"
+    var player2Name: String = "Player 2"
     
     var winnerText: String {
         if player1Score > player2Score {
-            return "Player 1 Wins!"
+            return "\(player1Name) Wins!"
         } else if player2Score > player1Score {
-            return "Player 2 Wins!"
+            return "\(player2Name) Wins!"
         } else {
             return "It's a Tie!"
         }
@@ -34,7 +36,11 @@ struct FinishView: View {
         }
     }
     
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    
     var body: some View {
+        let isLandscape = verticalSizeClass == .compact
+        
         ZStack {
             VortexViewReader { proxy in
                 VortexView(.confetti) {
@@ -49,39 +55,39 @@ struct FinishView: View {
                         .tag("circle")
                 }
                 
-                VStack(spacing: 16) {
+                VStack(spacing: isLandscape ? 10 : 16) {
                     Text(winnerText)
-                        .font(.system(size: 42, weight: .heavy))
+                        .font(.system(size: isLandscape ? 30 : 42, weight: .heavy))
                         .fontDesign(.rounded)
                         .foregroundStyle(winnerColor)
                     
-                    HStack(spacing: 40) {
+                    HStack(spacing: isLandscape ? 24 : 40) {
                         VStack {
-                            Text("Player 1")
-                                .font(.headline)
+                            Text(player1Name)
+                                .font(isLandscape ? .subheadline : .headline)
                                 .foregroundStyle(.blue)
                             Text("\(player1Score)")
-                                .font(.system(size: 48, weight: .bold))
+                                .font(.system(size: isLandscape ? 32 : 48, weight: .bold))
                                 .foregroundStyle(.blue)
                         }
                         
                         Text("vs")
-                            .font(.title2)
+                            .font(isLandscape ? .body : .title2)
                             .foregroundStyle(.secondary)
                         
                         VStack {
-                            Text("Player 2")
-                                .font(.headline)
+                            Text(player2Name)
+                                .font(isLandscape ? .subheadline : .headline)
                                 .foregroundStyle(.red)
                             Text("\(player2Score)")
-                                .font(.system(size: 48, weight: .bold))
+                                .font(.system(size: isLandscape ? 32 : 48, weight: .bold))
                                 .foregroundStyle(.red)
                         }
                     }
                     
                     HStack(spacing: 16) {
                         Button("Settings") {
-                            gameStatus = .settings
+                            gameStatus = .intro
                         }
                         .buttonStyle(.borderedProminent)
                         
@@ -91,7 +97,7 @@ struct FinishView: View {
                         .buttonStyle(.borderedProminent)
                     }
                 }
-                .padding(30)
+                .padding(isLandscape ? 20 : 30)
                 .background(.ultraThinMaterial)
                 .clipShape(.rect(cornerRadius: 24))
                 .shadow(radius: 10)
@@ -99,10 +105,17 @@ struct FinishView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(white: 0.9))
+        .background(
+            LinearGradient(
+                colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3), Color.orange.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        )
     }
 }
 
 #Preview {
-    FinishView(gameStatus: .constant(.settings), player1Score: 5, player2Score: 3)
+    FinishView(gameStatus: .constant(.intro), player1Score: 5, player2Score: 3)
 }
