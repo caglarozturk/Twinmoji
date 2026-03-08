@@ -101,7 +101,9 @@ struct FinishView: View {
                 .background(.ultraThinMaterial)
                 .clipShape(.rect(cornerRadius: 24))
                 .shadow(radius: 10)
-                .onAppear(perform: proxy.burst)
+                .onAppear {
+                    proxy.burst()
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

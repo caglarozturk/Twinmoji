@@ -7,30 +7,21 @@
 
 import SwiftUI
 
-enum AnswerState {
-    case waiting
-    case player1
-    case player2
-}
-
 struct ContentView: View {
     
-    @State private var currentEmoji = [String]()
+    var settings: GameSettings
+    var engine: GameEngine
     
-    @State private var leftCard = [String]()
-    @State private var rightCard = [String]()
+    @Binding var gameStatus: GameStatus
+    @Binding var finalPlayer1Score: Int
+    @Binding var finalPlayer2Score: Int
     
-    @State private var answerState = AnswerState.waiting
-    @State private var player1Score = 0
-    @State private var player2Score = 0
+    // MARK: - Animation State (view-only)
     
     @State private var answerColor = Color.clear
     @State private var answerScale = 1.0
     @State private var answerAnchor = UnitPoint.center
     
-    @State private var currentItemCount = 0
-    @State private var player1Streak = 0
-    @State private var player2Streak = 0
     @State private var streakText = ""
     @State private var showStreak = false
     @State private var countdownValue = 3
@@ -45,157 +36,267 @@ struct ContentView: View {
     @State private var player2ScorePop = ""
     @State private var showPlayer2ScorePop = false
     
-    var itemCount: Int
-    var answerTime: Double
-    var winScore: Int = 5
-    var player1Name: String = "Player 1"
-    var player2Name: String = "Player 2"
-    
-    @Binding var gameStatus: GameStatus
-    @Binding var emojiType: EmojiType
-    @Binding var finalPlayer1Score: Int
-    @Binding var finalPlayer2Score: Int
-    
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     
     var body: some View {
+        let isLandscape = verticalSizeClass == .compact
         
-        GeometryReader { screen in
-            let safeLeading = screen.safeAreaInsets.leading
-            let safeTrailing = screen.safeAreaInsets.trailing
-            // Visible content width for labels + safe area inset for the colored background extension
-            let contentWidth: CGFloat = max(screen.size.width * 0.11, 80)
-            let playerWidthLeading = safeLeading + contentWidth
-            let playerWidthTrailing = safeTrailing + contentWidth
+        HStack(spacing: 0) {
+            // MARK: - Player 1 Button
+            PlayerButton(
+                answerState: engine.answerState,
+                score: engine.player1Score,
+                name: settings.player1Name,
+                color: .blue,
+                winScore: settings.winScore,
+                streak: engine.player1Streak,
+                side: .leading,
+                scorePop: player1ScorePop,
+                showScorePop: showPlayer1ScorePop,
+                onSelect: selectPlayer1
+            )
+            .frame(width: isLandscape ? 90 : 80)
             
-            ZStack(alignment: .topTrailing) {
+            // MARK: - Center Area
+            VStack(spacing: 0) {
+                // Top bar: timer + controls
                 HStack(spacing: 0) {
-                    PlayerButton(
-                        answerState: answerState,
-                        score: player1Score,
-                        name: player1Name,
-                        color: .blue,
-                        streak: player1Streak,
-                        side: .leading,
-                        scorePop: player1ScorePop,
-                        showScorePop: showPlayer1ScorePop,
-                        onSelect: selectPlayer1
-                    )
-                    .frame(width: playerWidthLeading)
-                    
-                    ZStack {
-                        answerColor
-                            .scaleEffect(x: answerScale, anchor: answerAnchor)
-                        
-                        if leftCard.isEmpty == false {
-                            HStack {
-                                CardView(card: leftCard, userCanAnswer: answerState != .waiting, onSelect: checkAnswer)
-                                CardView(card: rightCard, userCanAnswer: answerState != .waiting, onSelect: checkAnswer)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, verticalSizeClass == .compact ? 8 : 0)
-                            .offset(x: shakeOffset)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .fill(flashColor)
-                                    .allowsHitTesting(false)
-                                    .padding(.horizontal, 10)
-                            )
-                        }
-                        
-                        if showStreak {
-                            Text(streakText)
-                                .font(.system(size: verticalSizeClass == .compact ? 28 : 36, weight: .heavy))
-                                .foregroundStyle(.orange)
-                                .shadow(color: .black.opacity(0.3), radius: 4)
-                                .transition(.scale.combined(with: .opacity))
+                    // Timer bar
+                    GeometryReader { timerGeo in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(.gray.opacity(0.2))
+                            
+                            Rectangle()
+                                .fill(engine.answerState == .player1 ? Color.blue : engine.answerState == .player2 ? Color.red : Color.gray.opacity(0.3))
+                                .frame(width: timerGeo.size.width * answerScale)
                         }
                     }
+                    .frame(height: isLandscape ? 5 : 6)
+                    .clipShape(Capsule())
+                    .padding(.leading, 12)
                     
-                    PlayerButton(
-                        answerState: answerState,
-                        score: player2Score,
-                        name: player2Name,
-                        color: .red,
-                        streak: player2Streak,
-                        side: .trailing,
-                        scorePop: player2ScorePop,
-                        showScorePop: showPlayer2ScorePop,
-                        onSelect: selectPlayer2
-                    )
-                    .frame(width: playerWidthTrailing)
+                    // Pause / End buttons
+                    HStack(spacing: 8) {
+                        Button {
+                            isPaused = true
+                        } label: {
+                            Image(systemName: "pause.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.gray)
+                                .frame(width: isLandscape ? 28 : 32, height: isLandscape ? 28 : 32)
+                                .background(.gray.opacity(0.12))
+                                .clipShape(Circle())
+                        }
+                        
+                        Button {
+                            gameStatus = .intro
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.gray)
+                                .frame(width: isLandscape ? 28 : 32, height: isLandscape ? 28 : 32)
+                                .background(.gray.opacity(0.12))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .padding(.horizontal, 10)
                 }
+                .padding(.top, isLandscape ? 6 : 10)
                 
-                HStack(spacing: 12) {
-                    Button("Pause", systemImage: "pause.circle") {
-                        isPaused = true
+                // Cards area
+                ZStack {
+                    if engine.leftCard.isEmpty == false {
+                        HStack(spacing: isLandscape ? 8 : 12) {
+                            CardView(card: engine.leftCard, userCanAnswer: engine.answerState != .waiting, onSelect: onCardSelect)
+                            CardView(card: engine.rightCard, userCanAnswer: engine.answerState != .waiting, onSelect: onCardSelect)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, isLandscape ? 6 : 10)
+                        .offset(x: shakeOffset)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(flashColor)
+                                .allowsHitTesting(false)
+                                .padding(.horizontal, 10)
+                        )
                     }
-                    .symbolVariant(.fill)
-                    .labelStyle(.iconOnly)
-                    .font(verticalSizeClass == .compact ? .title : .largeTitle)
-                    .tint(.white)
                     
-                    Button("End Game", systemImage: "xmark.circle") {
-                        gameStatus = .intro
+                    // Streak label
+                    if showStreak {
+                        Text(streakText)
+                            .font(.system(size: isLandscape ? 24 : 32, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.orange)
+                            .shadow(color: .black.opacity(0.2), radius: 4)
+                            .transition(.scale.combined(with: .opacity))
                     }
-                    .symbolVariant(.fill)
-                    .labelStyle(.iconOnly)
-                    .font(verticalSizeClass == .compact ? .title : .largeTitle)
-                    .tint(.white)
                 }
-                .padding(verticalSizeClass == .compact ? 20 : 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .background(Color(white: 0.93))
+            
+            // MARK: - Player 2 Button
+            PlayerButton(
+                answerState: engine.answerState,
+                score: engine.player2Score,
+                name: settings.player2Name,
+                color: .red,
+                winScore: settings.winScore,
+                streak: engine.player2Streak,
+                side: .trailing,
+                scorePop: player2ScorePop,
+                showScorePop: showPlayer2ScorePop,
+                onSelect: selectPlayer2
+            )
+            .frame(width: isLandscape ? 90 : 80)
         }
-        .ignoresSafeArea()
+        .background(Color(white: 0.93))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(white: 0.9))
+        // MARK: - Pause Overlay
         .overlay {
             if isPaused {
                 ZStack {
-                    Color.black.opacity(0.7)
-                    VStack(spacing: verticalSizeClass == .compact ? 12 : 20) {
+                    Color.black.opacity(0.6)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 16) {
+                        Image(systemName: "pause.circle.fill")
+                            .font(.system(size: verticalSizeClass == .compact ? 40 : 56))
+                            .foregroundStyle(.white.opacity(0.8))
+                        
                         Text("Paused")
-                            .font(.system(size: verticalSizeClass == .compact ? 32 : 48, weight: .heavy))
+                            .font(.system(size: verticalSizeClass == .compact ? 28 : 40, weight: .heavy, design: .rounded))
                             .foregroundStyle(.white)
-                            .fontDesign(.rounded)
                         
-                        Button("Resume") {
-                            isPaused = false
+                        VStack(spacing: 10) {
+                            Button {
+                                isPaused = false
+                            } label: {
+                                Text("Resume")
+                                    .font(.headline)
+                                    .frame(width: 180, height: 44)
+                                    .background(.white)
+                                    .foregroundStyle(.primary)
+                                    .clipShape(.rect(cornerRadius: 14))
+                            }
+                            
+                            Button {
+                                gameStatus = .intro
+                            } label: {
+                                Text("End Game")
+                                    .font(.headline)
+                                    .frame(width: 180, height: 44)
+                                    .background(.white.opacity(0.2))
+                                    .foregroundStyle(.white)
+                                    .clipShape(.rect(cornerRadius: 14))
+                            }
                         }
-                        .font(.title2.bold())
-                        .buttonStyle(.borderedProminent)
-                        
-                        Button("End Game") {
-                            gameStatus = .intro
-                        }
-                        .font(.title3)
-                        .buttonStyle(.bordered)
-                        .tint(.white)
                     }
+                    .padding(32)
+                    .background(.ultraThinMaterial)
+                    .clipShape(.rect(cornerRadius: 28))
+                    .shadow(color: .black.opacity(0.3), radius: 20)
                 }
-                .ignoresSafeArea()
             }
         }
+        // MARK: - Countdown Overlay
         .overlay {
             if showCountdown {
                 ZStack {
-                    Color.black.opacity(0.6)
-                    Text("\(countdownValue)")
-                        .font(.system(size: verticalSizeClass == .compact ? 80 : 120, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
+                    Color.black.opacity(0.55)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 8) {
+                        Text(countdownValue > 0 ? "\(countdownValue)" : "GO!")
+                            .font(.system(size: verticalSizeClass == .compact ? 72 : 100, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white)
+                            .contentTransition(.numericText())
+                            .shadow(color: .white.opacity(0.3), radius: 20)
+                    }
                 }
-                .ignoresSafeArea()
             }
         }
         .persistentSystemOverlays(.hidden)
         .onAppear {
             MusicManager.shared.stop()
+            wireEngineCallbacks()
             startCountdown()
         }
     }
     
-    func startCountdown() {
+    // MARK: - Engine Callback Wiring
+    
+    private func wireEngineCallbacks() {
+        engine.onCorrectAnswer = {
+            flashAnswer(correct: true)
+        }
+        engine.onWrongAnswer = {
+            flashAnswer(correct: false)
+            shakeCards()
+        }
+        engine.onTimeout = {
+            // Visual feedback handled via score pop
+        }
+        engine.onStreakEarned = { text in
+            showStreakLabel(text)
+        }
+        engine.onScorePop = { player, text in
+            showScorePop(player: player, text: text)
+        }
+        engine.onGameEnd = {
+            finalPlayer1Score = engine.player1Score
+            finalPlayer2Score = engine.player2Score
+            gameStatus = .finished
+        }
+        engine.onLevelCreated = {
+            // Transition is handled by wrapping createLevel in withAnimation
+        }
+    }
+    
+    // MARK: - Player Actions
+    
+    private func selectPlayer1() {
+        guard engine.answerState == .waiting else { return }
+        
+        SoundManager.playBuzzIn()
+        answerColor = .blue
+        answerAnchor = .leading
+        engine.selectPlayer(.player1)
+        
+        runClock()
+    }
+    
+    private func selectPlayer2() {
+        guard engine.answerState == .waiting else { return }
+        
+        SoundManager.playBuzzIn()
+        answerColor = .red
+        answerAnchor = .trailing
+        engine.selectPlayer(.player2)
+        
+        runClock()
+    }
+    
+    private func onCardSelect(_ emoji: String) {
+        answerColor = .clear
+        answerScale = 0
+        engine.checkTwoPlayerAnswer(emoji)
+    }
+    
+    // MARK: - Timer & Countdown
+    
+    private func runClock() {
+        answerScale = 1
+        let checkEmoji = engine.currentEmoji
+        
+        withAnimation(.linear(duration: settings.timeOut)) {
+            answerScale = 0
+        } completion: {
+            engine.handleTimeout(for: checkEmoji)
+        }
+    }
+    
+    private func startCountdown() {
         showCountdown = true
         countdownValue = 3
         
@@ -211,130 +312,15 @@ struct ContentView: View {
             withAnimation {
                 showCountdown = false
             }
-            createLevel()
-        }
-    }
-    
-    func createLevel() {
-        currentItemCount = itemCount
-        currentEmoji = EmojiData.emojis(for: emojiType).shuffled()
-
-        withAnimation(.spring(duration: 0.75)) {
-            leftCard = Array(currentEmoji[0..<currentItemCount]).shuffled()
-            rightCard = Array(currentEmoji[currentItemCount + 1..<currentItemCount + currentItemCount] + [currentEmoji[0]]).shuffled()
-        }
-    }
-    
-    func selectPlayer1() {
-        guard answerState == .waiting else { return }
-        
-        SoundManager.playBuzzIn()
-        answerColor = .blue
-        answerAnchor = .leading
-        answerState = .player1
-        
-        runClock()
-    }
-    
-    func selectPlayer2() {
-        guard answerState == .waiting else { return }
-        
-        SoundManager.playBuzzIn()
-        answerColor = .red
-        answerAnchor = .trailing
-        answerState = .player2
-        
-        runClock()
-    }
-    
-    func timeOut(for emoji: [String]) {
-        guard currentEmoji == emoji else { return }
-        
-        SoundManager.playTimeout()
-        
-        if answerState == .player1 {
-            player1Score -= 1
-            player1Streak = 0
-            showScorePop(player: 1, text: "-1")
-        } else if answerState == .player2 {
-            player2Score -= 1
-            player2Streak = 0
-            showScorePop(player: 2, text: "-1")
-        }
-        
-        answerState = .waiting
-    }
-    
-    func runClock() {
-        answerScale = 1
-        
-        let checkEmoji = currentEmoji
-        
-        withAnimation(.linear(duration: answerTime)) {
-            answerScale = 0
-        } completion: {
-            timeOut(for: checkEmoji)
-        }
-    }
-    
-    func checkAnswer(_ emoji: String) {
-        if emoji == currentEmoji[0] {
-            SoundManager.playCorrect()
-            flashAnswer(correct: true)
-            var bonus = 0
-            
-            if answerState == .player1 {
-                player1Streak += 1
-                player2Streak = 0
-                if player1Streak >= 3 {
-                    bonus = player1Streak - 2
-                }
-                player1Score += 1 + bonus
-                showScorePop(player: 1, text: "+\(1 + bonus)")
-            } else if answerState == .player2 {
-                player2Streak += 1
-                player1Streak = 0
-                if player2Streak >= 3 {
-                    bonus = player2Streak - 2
-                }
-                player2Score += 1 + bonus
-                showScorePop(player: 2, text: "+\(1 + bonus)")
-            }
-            
-            if bonus > 0 {
-                let streak = answerState == .player1 ? player1Streak : player2Streak
-                showStreakLabel("\(streak)x Streak! +\(1 + bonus)")
-            }
-            
-            if player1Score >= winScore || player2Score >= winScore {
-                SoundManager.playGameEnd()
-                finalPlayer1Score = player1Score
-                finalPlayer2Score = player2Score
-                gameStatus = .finished
-            } else {
-                createLevel()
-            }
-        } else {
-            SoundManager.playWrong()
-            flashAnswer(correct: false)
-            shakeCards()
-            if answerState == .player1 {
-                player1Score -= 1
-                player1Streak = 0
-                showScorePop(player: 1, text: "-1")
-            } else if answerState == .player2 {
-                player2Score -= 1
-                player2Streak = 0
-                showScorePop(player: 2, text: "-1")
+            withAnimation(.spring(duration: 0.75)) {
+                engine.createLevel()
             }
         }
-        
-        answerColor = .clear
-        answerScale = 0
-        answerState = .waiting
     }
     
-    func showScorePop(player: Int, text: String) {
+    // MARK: - Animation Helpers
+    
+    private func showScorePop(player: Int, text: String) {
         if player == 1 {
             player1ScorePop = text
             withAnimation(.spring(duration: 0.3)) {
@@ -360,7 +346,7 @@ struct ContentView: View {
         }
     }
     
-    func flashAnswer(correct: Bool) {
+    private func flashAnswer(correct: Bool) {
         withAnimation(.easeIn(duration: 0.1)) {
             flashColor = correct ? Color.green.opacity(0.3) : Color.red.opacity(0.3)
         }
@@ -372,7 +358,7 @@ struct ContentView: View {
         }
     }
     
-    func shakeCards() {
+    private func shakeCards() {
         withAnimation(.default) {
             shakeOffset = 10
         }
@@ -388,7 +374,7 @@ struct ContentView: View {
         }
     }
     
-    func showStreakLabel(_ text: String) {
+    private func showStreakLabel(_ text: String) {
         streakText = text
         withAnimation(.spring(duration: 0.3)) {
             showStreak = true
@@ -404,5 +390,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(itemCount: 9, answerTime: 1, gameStatus: .constant(.intro), emojiType: .constant(.emoji), finalPlayer1Score: .constant(0), finalPlayer2Score: .constant(0))
+    ContentView(settings: GameSettings(), engine: GameEngine(settings: GameSettings()), gameStatus: .constant(.intro), finalPlayer1Score: .constant(0), finalPlayer2Score: .constant(0))
 }

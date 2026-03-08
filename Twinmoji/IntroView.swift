@@ -25,11 +25,9 @@ struct IntroView: View {
     @State private var titleOpacity = 0.0
     @State private var buttonsOpacity = 0.0
     @State private var pulsePlay = false
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @State private var showHowToPlay = false
     
     private let emojiPool = ["😎", "🥰", "😂", "🍓", "🍊", "🐓", "🦋", "🍉", "🥝", "😇", "🍎", "🐸", "🦚", "🍌", "😍", "🐢", "🍒", "😛", "🦜", "🍑"]
-    
-    private var isLandscape: Bool { verticalSizeClass == .compact }
     
     var body: some View {
         ZStack {
@@ -46,17 +44,16 @@ struct IntroView: View {
                 FloatingEmojiView(emoji: emoji)
             }
             
-            // Main content
-            if isLandscape {
-                // Landscape: side-by-side layout
+            // Main content — landscape layout
+            VStack(spacing: 0) {
                 HStack(spacing: 40) {
                     // Title on the left
                     VStack(spacing: 6) {
                         Text("🔍")
-                            .font(.system(size: 40))
+                            .font(.system(size: 44))
                         
                         Text("Twinmoji")
-                            .font(.system(size: 38, weight: .heavy))
+                            .font(.system(size: 42, weight: .heavy))
                             .fontDesign(.rounded)
                             .foregroundStyle(
                                 LinearGradient(
@@ -85,12 +82,29 @@ struct IntroView: View {
                             }
                             .font(.title3.bold())
                             .fontDesign(.rounded)
-                            .frame(maxWidth: 180)
-                            .padding(.vertical, 10)
+                            .frame(maxWidth: 200)
+                            .padding(.vertical, 12)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.blue)
                         .scaleEffect(pulsePlay ? 1.05 : 1.0)
+                        
+                        HStack(spacing: 12) {
+                            Button {
+                                showHowToPlay = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "questionmark.circle.fill")
+                                    Text("How to Play")
+                                }
+                                .font(.body.bold())
+                                .fontDesign(.rounded)
+                                .frame(maxWidth: 130)
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.secondary)
+                        }
                         
                         HStack(spacing: 12) {
                             Button {
@@ -127,93 +141,20 @@ struct IntroView: View {
                     .opacity(buttonsOpacity)
                 }
                 .padding(.horizontal, 40)
-            } else {
-                // Portrait: vertical layout
-                VStack(spacing: 32) {
-                    Spacer()
-                    
-                    // Title
-                    VStack(spacing: 8) {
-                        Text("🔍")
-                            .font(.system(size: 60))
-                        
-                        Text("Twinmoji")
-                            .font(.system(size: 52, weight: .heavy))
-                            .fontDesign(.rounded)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.blue, .purple, .pink],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                        
-                        Text("Find the matching emoji!")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                            .fontDesign(.rounded)
-                    }
-                    .scaleEffect(titleScale)
-                    .opacity(titleOpacity)
-                    
-                    Spacer()
-                    
-                    // Buttons
-                    VStack(spacing: 16) {
-                        Button {
-                            gameStatus = .playing
-                        } label: {
-                            HStack {
-                                Image(systemName: "play.fill")
-                                Text("Play")
-                            }
-                            .font(.title2.bold())
-                            .fontDesign(.rounded)
-                            .frame(maxWidth: 220)
-                            .padding(.vertical, 14)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.blue)
-                        .scaleEffect(pulsePlay ? 1.05 : 1.0)
-                        
-                        HStack(spacing: 16) {
-                            Button {
-                                showSettings = true
-                            } label: {
-                                HStack {
-                                    Image(systemName: "gearshape.fill")
-                                    Text("Settings")
-                                }
-                                .font(.body.bold())
-                                .fontDesign(.rounded)
-                                .frame(maxWidth: 100)
-                                .padding(.vertical, 10)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.secondary)
-                            
-                            Button {
-                                showStats = true
-                            } label: {
-                                HStack {
-                                    Image(systemName: "chart.bar.fill")
-                                    Text("Stats")
-                                }
-                                .font(.body.bold())
-                                .fontDesign(.rounded)
-                                .frame(maxWidth: 100)
-                                .padding(.vertical, 10)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.secondary)
-                        }
-                    }
-                    .opacity(buttonsOpacity)
-                    
-                    Spacer()
-                        .frame(height: 40)
+                
+                Spacer().frame(minHeight: 4, maxHeight: 12)
+                
+                // Banner Ad — pinned to the bottom, outside main content
+                if !StoreManager.shared.isAdsRemoved {
+                    BannerAdView(adUnitID: AdManager.bannerAdUnitID)
+                        .frame(height: 50)
+                        .frame(maxWidth: 320)
+                        .padding(.bottom, 4)
                 }
             }
+        }
+        .sheet(isPresented: $showHowToPlay) {
+            HowToPlayView()
         }
         .persistentSystemOverlays(.hidden)
         .onAppear {

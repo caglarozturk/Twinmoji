@@ -6,12 +6,29 @@
 //
 
 import SwiftUI
+import GoogleMobileAds
 
 @main
 struct TwinmojiApp: App {
+    @State private var settings = GameSettings()
+    
+    init() {
+        // Initialize Google Mobile Ads SDK
+        MobileAds.shared.start()
+        
+        // Initialize store and sync ad removal state
+        _ = StoreManager.shared
+        if StoreManager.shared.isAdsRemoved {
+            AdManager.shared.disableAds()
+        }
+        
+        // Initialize ad manager
+        AdManager.shared.initialize()
+    }
+    
     var body: some Scene {
         WindowGroup {
-            MenuView()
+            MenuView(settings: settings)
                 .preferredColorScheme(.light)
         }
     }

@@ -33,33 +33,49 @@ struct CardView: View {
         GeometryReader { geo in
             let minSize: CGFloat = columns >= 4 ? 16 : 24
             let emojiSize = max(min(
-                geo.size.width / CGFloat(columns) * 0.7,
-                geo.size.height / CGFloat(rows) * 0.7,
-                64
+                geo.size.width / CGFloat(columns) * 0.65,
+                geo.size.height / CGFloat(rows) * 0.65,
+                60
             ), minSize)
-            Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+            
+            Grid(horizontalSpacing: 2, verticalSpacing: 2) {
                 ForEach(0..<rows, id: \.self) { i in
                     GridRow {
                         ForEach(0..<columns, id: \.self) { j in
                             let text = card[i * columns + j]
                             
-                            Button(text) {
+                            Button {
                                 onSelect(text)
+                            } label: {
+                                Text(text)
+                                    .font(.system(size: emojiSize))
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(.gray.opacity(userCanAnswer ? 0.08 : 0.03))
+                                    )
                             }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .buttonStyle(.plain)
                         }
                     }
                 }
             }
-            .font(.system(size: emojiSize))
+            .padding(6)
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .aspectRatio(CGFloat(columns) / CGFloat(rows), contentMode: .fit)
-        .padding(8)
-        .background(.white)
-        .clipShape(.rect(cornerRadius: 20))
-        .shadow(radius: 10)
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.white)
+                .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(.gray.opacity(0.12), lineWidth: 1)
+        )
         .disabled(userCanAnswer == false)
+        .opacity(userCanAnswer ? 1 : 0.85)
         .transition(.push(from: .top))
         .id(card)
     }

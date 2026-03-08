@@ -7,19 +7,13 @@ import SwiftUI
 
 struct SinglePlayerView: View {
     
-    @State private var currentEmoji = [String]()
-    @State private var leftCard = [String]()
-    @State private var rightCard = [String]()
+    var settings: GameSettings
+    var engine: GameEngine
     
-    @State private var score = 0
-    @State private var lives = 5
-    @State private var currentItemCount = 0
-    @State private var roundsPlayed = 0
-    @State private var timeRemaining = 0.0
-    @State private var currentAnswerTime = 0.0
-    @State private var timerActive = false
-    @State private var gameOver = false
-    @State private var streak = 0
+    @Binding var gameStatus: GameStatus
+    
+    // MARK: - Animation State (view-only)
+    
     @State private var streakText = ""
     @State private var showStreak = false
     @State private var countdownValue = 3
@@ -27,22 +21,14 @@ struct SinglePlayerView: View {
     @State private var flashColor = Color.clear
     @State private var shakeOffset: CGFloat = 0
     @State private var isPaused = false
-    @State private var timerGeneration = 0
     
-    var itemCount: Int
-    var answerTime: Double
-    
-    @Binding var gameStatus: GameStatus
-    @Binding var emojiType: EmojiType
-    
-    @AppStorage("soloHighScore") private var highScore = 0
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     
     var body: some View {
         ZStack {
             Color(white: 0.9).ignoresSafeArea()
             
-            if gameOver {
+            if engine.gameOver {
                 LinearGradient(
                     colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3), Color.orange.opacity(0.2)],
                     startPoint: .topLeading,
@@ -59,7 +45,7 @@ struct SinglePlayerView: View {
                         HStack(spacing: 12) {
                             Button("Pause", systemImage: "pause.circle") {
                                 isPaused = true
-                                timerActive = false
+                                engine.pauseSoloTimer()
                             }
                             .symbolVariant(.fill)
                             .labelStyle(.iconOnly)
@@ -77,21 +63,21 @@ struct SinglePlayerView: View {
                         
                         HStack(spacing: 4) {
                             ForEach(0..<5, id: \.self) { i in
-                                Image(systemName: i < lives ? "heart.fill" : "heart")
-                                    .foregroundStyle(i < lives ? .red : .gray)
+                                Image(systemName: i < engine.lives ? "heart.fill" : "heart")
+                                    .foregroundStyle(i < engine.lives ? .red : .gray)
                                     .font(.title3)
                             }
                         }
                         
-                        Text("Score: \(score)")
+                        Text("Score: \(engine.score)")
                             .font(.title2.bold())
                             .monospacedDigit()
                         
-                        if streak >= 2 {
+                        if engine.streak >= 2 {
                             HStack(spacing: 2) {
                                 Image(systemName: "flame.fill")
                                     .foregroundStyle(.orange)
-                                Text("\(streak)x")
+                                Text("\(engine.streak)x")
                                     .font(.headline.bold())
                             }
                             .transition(.scale.combined(with: .opacity))
@@ -103,8 +89,8 @@ struct SinglePlayerView: View {
                                 Spacer()
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(timerColor)
-                                    .frame(width: 8, height: geo.size.height * max(currentAnswerTime > 0 ? timeRemaining / currentAnswerTime : 0, 0))
-                                    .animation(.linear(duration: 0.05), value: timeRemaining)
+                                    .frame(width: 8, height: geo.size.height * max(engine.currentAnswerTime > 0 ? engine.timeRemaining / engine.currentAnswerTime : 0, 0))
+                                    .animation(.linear(duration: 0.05), value: engine.timeRemaining)
                             }
                             .frame(maxWidth: .infinity)
                         }
@@ -114,10 +100,10 @@ struct SinglePlayerView: View {
                     
                     // Right side: Cards
                     ZStack {
-                        if leftCard.isEmpty == false {
+                        if engine.leftCard.isEmpty == false {
                             HStack {
-                                CardView(card: leftCard, userCanAnswer: true, onSelect: checkAnswer)
-                                CardView(card: rightCard, userCanAnswer: true, onSelect: checkAnswer)
+                                CardView(card: engine.leftCard, userCanAnswer: true, onSelect: onCardSelect)
+                                CardView(card: engine.rightCard, userCanAnswer: true, onSelect: onCardSelect)
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 8)
@@ -147,7 +133,7 @@ struct SinglePlayerView: View {
                         HStack(spacing: 12) {
                             Button("Pause", systemImage: "pause.circle") {
                                 isPaused = true
-                                timerActive = false
+                                engine.pauseSoloTimer()
                             }
                             .symbolVariant(.fill)
                             .labelStyle(.iconOnly)
@@ -167,8 +153,8 @@ struct SinglePlayerView: View {
                         
                         HStack(spacing: 4) {
                             ForEach(0..<5, id: \.self) { i in
-                                Image(systemName: i < lives ? "heart.fill" : "heart")
-                                    .foregroundStyle(i < lives ? .red : .gray)
+                                Image(systemName: i < engine.lives ? "heart.fill" : "heart")
+                                    .foregroundStyle(i < engine.lives ? .red : .gray)
                                     .font(.title2)
                             }
                         }
@@ -176,17 +162,17 @@ struct SinglePlayerView: View {
                         Spacer()
                         
                         HStack(spacing: 8) {
-                            if streak >= 2 {
+                            if engine.streak >= 2 {
                                 HStack(spacing: 2) {
                                     Image(systemName: "flame.fill")
                                         .foregroundStyle(.orange)
-                                    Text("\(streak)x")
+                                    Text("\(engine.streak)x")
                                         .font(.headline.bold())
                                 }
                                 .transition(.scale.combined(with: .opacity))
                             }
                             
-                            Text("Score: \(score)")
+                            Text("Score: \(engine.score)")
                                 .font(.title.bold())
                                 .monospacedDigit()
                         }
@@ -197,8 +183,8 @@ struct SinglePlayerView: View {
                     GeometryReader { geo in
                         RoundedRectangle(cornerRadius: 4)
                             .fill(timerColor)
-                            .frame(width: geo.size.width * max(currentAnswerTime > 0 ? timeRemaining / currentAnswerTime : 0, 0), height: 8)
-                            .animation(.linear(duration: 0.05), value: timeRemaining)
+                            .frame(width: geo.size.width * max(engine.currentAnswerTime > 0 ? engine.timeRemaining / engine.currentAnswerTime : 0, 0), height: 8)
+                            .animation(.linear(duration: 0.05), value: engine.timeRemaining)
                     }
                     .frame(height: 8)
                     .padding(.horizontal, 20)
@@ -206,10 +192,10 @@ struct SinglePlayerView: View {
                     Spacer()
                     
                     ZStack {
-                        if leftCard.isEmpty == false {
+                        if engine.leftCard.isEmpty == false {
                             HStack {
-                                CardView(card: leftCard, userCanAnswer: true, onSelect: checkAnswer)
-                                CardView(card: rightCard, userCanAnswer: true, onSelect: checkAnswer)
+                                CardView(card: engine.leftCard, userCanAnswer: true, onSelect: onCardSelect)
+                                CardView(card: engine.rightCard, userCanAnswer: true, onSelect: onCardSelect)
                             }
                             .padding(.horizontal, 10)
                             .offset(x: shakeOffset)
@@ -247,7 +233,7 @@ struct SinglePlayerView: View {
                         
                         Button("Resume") {
                             isPaused = false
-                            startTimer()
+                            engine.resumeSoloTimer()
                         }
                         .font(.title2.bold())
                         .buttonStyle(.borderedProminent)
@@ -278,44 +264,48 @@ struct SinglePlayerView: View {
         .persistentSystemOverlays(.hidden)
         .onAppear {
             MusicManager.shared.stop()
-            currentItemCount = itemCount
-            currentAnswerTime = answerTime
+            engine.startSoloGame()
+            wireEngineCallbacks()
             startCountdown()
         }
     }
     
-    var timerColor: Color {
-        guard currentAnswerTime > 0 else { return .red }
-        let ratio = timeRemaining / currentAnswerTime
+    // MARK: - Computed Properties
+    
+    private var timerColor: Color {
+        guard engine.currentAnswerTime > 0 else { return .red }
+        let ratio = engine.timeRemaining / engine.currentAnswerTime
         if ratio > 0.5 { return .green }
         if ratio > 0.25 { return .orange }
         return .red
     }
     
+    // MARK: - Solo Finish View
+    
     @ViewBuilder
-    var soloFinishView: some View {
+    private var soloFinishView: some View {
         VStack(spacing: verticalSizeClass == .compact ? 8 : 16) {
             Text("Game Over")
                 .font(verticalSizeClass == .compact ? .title.bold() : .largeTitle.bold())
                 .fontDesign(.rounded)
             
-            Text("Score: \(score)")
+            Text("Score: \(engine.score)")
                 .font(verticalSizeClass == .compact ? .title3 : .title)
             
-            if score > highScore {
+            if engine.score > settings.soloHighScore {
                 Text("New High Score! 🏆")
                     .font(verticalSizeClass == .compact ? .body : .title2)
                     .foregroundStyle(.orange)
-                    .onAppear { highScore = score }
             } else {
-                Text("High Score: \(highScore)")
+                Text("High Score: \(settings.soloHighScore)")
                     .font(verticalSizeClass == .compact ? .body : .title2)
                     .foregroundStyle(.secondary)
             }
             
             HStack(spacing: 12) {
                 Button("Play Again") {
-                    resetGame()
+                    engine.resetSoloGame()
+                    startCountdown()
                 }
                 .buttonStyle(.borderedProminent)
                 
@@ -331,10 +321,49 @@ struct SinglePlayerView: View {
         .shadow(radius: 10)
     }
     
-    func startCountdown() {
+    // MARK: - Engine Callback Wiring
+    
+    private func wireEngineCallbacks() {
+        engine.onCorrectAnswer = {
+            flashAnswer(correct: true)
+        }
+        engine.onWrongAnswer = {
+            flashAnswer(correct: false)
+            shakeCards()
+        }
+        engine.onStreakEarned = { text in
+            showStreakLabel(text)
+        }
+        engine.onLifeLost = {
+            // Visual feedback from engine (heart removal is automatic via @Observable)
+        }
+        engine.onGameEnd = {
+            // Interstitial ad (every 3rd game)
+            if AdManager.shared.gameDidFinish() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    AdManager.shared.presentInterstitial()
+                }
+            }
+            
+            // Rating prompt
+            ReviewManager.registerGameAndPromptIfNeeded()
+        }
+        engine.onLevelCreated = {
+            // Cards animate via @Observable tracking
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func onCardSelect(_ emoji: String) {
+        engine.checkSoloAnswer(emoji)
+    }
+    
+    // MARK: - Countdown
+    
+    private func startCountdown() {
         showCountdown = true
         countdownValue = 3
-        timerActive = false
         
         Task {
             for i in stride(from: 2, through: 0, by: -1) {
@@ -348,98 +377,16 @@ struct SinglePlayerView: View {
             withAnimation {
                 showCountdown = false
             }
-            createLevel()
-            startTimer()
-        }
-    }
-    
-    func resetGame() {
-        score = 0
-        lives = 5
-        roundsPlayed = 0
-        streak = 0
-        currentItemCount = itemCount
-        currentAnswerTime = answerTime
-        gameOver = false
-        startCountdown()
-    }
-    
-    func createLevel() {
-        currentEmoji = EmojiData.emojis(for: emojiType).shuffled()
-        
-        withAnimation(.spring(duration: 0.75)) {
-            leftCard = Array(currentEmoji[0..<currentItemCount]).shuffled()
-            rightCard = Array(currentEmoji[currentItemCount + 1..<currentItemCount + currentItemCount] + [currentEmoji[0]]).shuffled()
-        }
-    }
-    
-    func startTimer() {
-        // Increment generation to invalidate any previous timer task
-        timerGeneration += 1
-        let myGeneration = timerGeneration
-        
-        // Only reset timeRemaining if starting fresh (not resuming from pause)
-        if !isPaused {
-            timeRemaining = currentAnswerTime
-        }
-        timerActive = true
-        
-        Task {
-            while timerActive && timeRemaining > 0 && timerGeneration == myGeneration {
-                try? await Task.sleep(for: .milliseconds(50))
-                if timerActive && timerGeneration == myGeneration {
-                    timeRemaining -= 0.05
-                }
+            withAnimation(.spring(duration: 0.75)) {
+                engine.createLevel()
             }
-            
-            if timerActive && timeRemaining <= 0 && timerGeneration == myGeneration {
-                loseLife()
-            }
+            engine.startSoloTimer()
         }
     }
     
-    func loseLife() {
-        timerActive = false
-        lives -= 1
-        streak = 0
-        
-        if lives <= 0 {
-            SoundManager.playGameEnd()
-            let result = GameResult(date: Date(), player1Score: score, player2Score: 0, gameMode: "singlePlayer")
-            StatsManager.shared.saveResult(result)
-            gameOver = true
-        } else {
-            SoundManager.playWrong()
-            createLevel()
-            startTimer()
-        }
-    }
+    // MARK: - Animation Helpers
     
-    func checkAnswer(_ emoji: String) {
-        timerActive = false
-        
-        if emoji == currentEmoji[0] {
-            SoundManager.playCorrect()
-            flashAnswer(correct: true)
-            streak += 1
-            var bonus = 0
-            if streak >= 3 {
-                bonus = streak - 2
-                showStreakLabel("\(streak)x Streak! +\(1 + bonus)")
-            }
-            score += 1 + bonus
-            roundsPlayed += 1
-            createLevel()
-            startTimer()
-        } else {
-            flashAnswer(correct: false)
-            shakeCards()
-            streak = 0
-            loseLife()
-        }
-    }
-    
-    func flashAnswer(correct: Bool) {
+    private func flashAnswer(correct: Bool) {
         withAnimation(.easeIn(duration: 0.1)) {
             flashColor = correct ? Color.green.opacity(0.3) : Color.red.opacity(0.3)
         }
@@ -451,7 +398,7 @@ struct SinglePlayerView: View {
         }
     }
     
-    func shakeCards() {
+    private func shakeCards() {
         withAnimation(.default) {
             shakeOffset = 10
         }
@@ -467,7 +414,7 @@ struct SinglePlayerView: View {
         }
     }
     
-    func showStreakLabel(_ text: String) {
+    private func showStreakLabel(_ text: String) {
         streakText = text
         withAnimation(.spring(duration: 0.3)) {
             showStreak = true
@@ -482,5 +429,5 @@ struct SinglePlayerView: View {
 }
 
 #Preview {
-    SinglePlayerView(itemCount: 9, answerTime: 2.0, gameStatus: .constant(.playing), emojiType: .constant(.emoji))
+    SinglePlayerView(settings: GameSettings(), engine: GameEngine(settings: GameSettings()), gameStatus: .constant(.playing))
 }
